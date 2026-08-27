@@ -85,7 +85,7 @@ main{min-height:0;display:grid;grid-template-columns:minmax(0,2.25fr) minmax(330
 <header>
   <div>
     <h1>🇰🇷 대한민국 지역 찾기</h1>
-    <div class="subtitle">인구 상위 40개 시 · 지역 이름을 선택한 뒤 지도에서 위치를 터치하세요.</div>
+    <div class="subtitle">시·군 단위 백지도 · 인구 상위 40개 시의 위치를 찾아보세요.</div>
   </div>
   <div class="counter"><span id="placedCount">0</span> / 40 배치</div>
 </header>
@@ -133,6 +133,7 @@ main{min-height:0;display:grid;grid-template-columns:minmax(0,2.25fr) minmax(330
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <script>
 "use strict";
 
@@ -256,12 +257,33 @@ async function loadGeo(){
   throw lastError || new Error("지도 데이터를 불러오지 못했습니다.");
 }
 
+function geometryAsMultiPolygon(geom){
+  if(!geom) return [];
+  if(geom.type==="Polygon") return [geom.coordinates];
+  if(geom.type==="MultiPolygon") return geom.coordinates;
+  return [];
+}
+
+function dissolveFeatures(features){
+  if(features.length===1) return features[0].geometry;
+  try{
+    const pieces=features.map(f=>geometryAsMultiPolygon(f.geometry)).filter(x=>x.length);
+    if(!pieces.length) return features[0].geometry;
+    const merged=polygonClipping.union(...pieces);
+    return {type:"MultiPolygon",coordinates:merged};
+  }catch(err){
+    console.warn("지역 경계 통합 실패:",err);
+    // 통합 라이브러리 오류 시에도 화면은 뜨도록 멀티폴리곤으로 묶어 표시
+    return {type:"MultiPolygon",coordinates:features.flatMap(f=>geometryAsMultiPolygon(f.geometry))};
+  }
+}
+
 function buildMap(data){
   const features=data.features;
   projection=createProjection(features);
   groups.clear(); regionsG.innerHTML=""; labelsG.innerHTML=""; answersG.innerHTML="";
 
-  // 논리 지역 단위로 묶기
+  // 최소 단위는 '시·군'. 일반 시 내부의 구와 특별·광역시 내부 자치구는 하나로 합친다.
   for(const f of features){
     const p=f.properties||{};
     const raw=pName(p), sido=pSido(p);
@@ -273,23 +295,25 @@ function buildMap(data){
     g.sido=sido;
     g.label=METRO_NAMES[key] || key;
   }
-  groups.forEach(g=>g.center=groupCenter(g.features));
 
-  for(const f of features){
-    const p=f.properties||{};
-    const raw=pName(p), sido=pSido(p);
-    if(!raw) continue;
-    const key=metroLogical(raw,sido);
+  // 실제 기하 경계를 합쳐 내부 '구' 경계선 자체를 제거한다.
+  groups.forEach(g=>{
+    g.geometry=dissolveFeatures(g.features);
+    g.center=groupCenter(g.features);
+  });
+
+  // 지역 하나당 path 하나만 그린다. 예: 포항시 남구+북구 -> 포항시 하나.
+  groups.forEach((g,key)=>{
     const path=document.createElementNS(SVG_NS,"path");
-    path.setAttribute("d",featurePath(f.geometry));
+    path.setAttribute("d",featurePath(g.geometry));
     path.setAttribute("class","region"+(isQuiz(key)?" quiz":""));
     path.dataset.key=key;
     path.addEventListener("click",e=>{e.stopPropagation();placeOn(key)});
     regionsG.appendChild(path);
-    groups.get(key).paths.push(path);
-  }
+    g.paths.push(path);
+  });
 
-  // 비출제 시·군 이름 + 광역시 이름 표시
+  // Top40 이외의 시·군, 그리고 기준점이 되는 특별·광역시 이름만 표시
   groups.forEach((g,key)=>{
     if(isQuiz(key)) return;
     const [x,y]=g.center;
