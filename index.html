@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f4f7fb">
+<title>대한민국 지역 찾기 · Top 40</title>
+<style>
+:root{
+  --bg:#f3f6fa; --panel:#fff; --ink:#182033; --muted:#6d7788;
+  --line:#9ba7b7; --accent:#315fe6; --accent-soft:#e9efff;
+  --good:#1b8c4c; --bad:#c53a3a; --sea:#eaf4fb;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:var(--bg)}
+button{font:inherit;cursor:pointer}
+#app{height:100%;display:grid;grid-template-rows:auto 1fr}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 15px;background:#fff;border-bottom:1px solid #e2e7ee}
+h1{margin:0;font-size:20px;letter-spacing:-.4px}
+.subtitle{margin-top:3px;font-size:12px;color:var(--muted)}
+.counter{white-space:nowrap;font-size:14px;font-weight:850;padding:8px 12px;border-radius:999px;background:#eef2f7}
+main{min-height:0;display:grid;grid-template-columns:minmax(0,2.25fr) minmax(330px,1fr);gap:12px;padding:12px}
+.panel{min-height:0;background:var(--panel);border-radius:18px;box-shadow:0 2px 13px rgba(28,39,61,.08);overflow:hidden}
+.mapPanel{position:relative;background:var(--sea);touch-action:none}
+#map{display:block;width:100%;height:100%}
+.region{fill:#fff;stroke:#9ca9b9;stroke-width:.55;vector-effect:non-scaling-stroke}
+.region.quiz{fill:#fff}
+.region.good{fill:#dff5e7;stroke:var(--good);stroke-width:1.7}
+.region.bad{fill:#fde5e5;stroke:var(--bad);stroke-width:1.7}
+.fixedLabel,.metroLabel,.answerLabel{
+  text-anchor:middle;dominant-baseline:middle;pointer-events:none;
+  paint-order:stroke;stroke:#fff;stroke-linejoin:round
+}
+.fixedLabel{font-size:7.1px;font-weight:650;fill:#566477;stroke-width:2.3px}
+.metroLabel{font-size:9px;font-weight:850;fill:#344255;stroke-width:3px}
+.answerLabel{font-size:8px;font-weight:900;fill:#244599;stroke-width:2.8px}
+.mapGuide{position:absolute;left:12px;top:12px;z-index:4;background:rgba(255,255,255,.94);border-radius:12px;padding:9px 11px;font-size:12px;line-height:1.52;box-shadow:0 2px 9px rgba(0,0,0,.09)}
+.mapGuide b{color:#263653}
+.zoom{position:absolute;right:12px;top:12px;z-index:4;display:grid;gap:6px}
+.zoom button{border:0;width:43px;height:43px;border-radius:12px;background:#fff;font-size:21px;font-weight:900;box-shadow:0 2px 9px rgba(0,0,0,.11)}
+.status{position:absolute;left:12px;bottom:12px;z-index:4;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.94);font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.status.result{display:none}
+.loading{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:var(--sea);text-align:center;padding:30px;font-weight:750}
+.loading small{display:block;margin-top:7px;color:var(--muted);font-weight:500;line-height:1.5}
+.side{display:grid;grid-template-rows:auto auto 1fr auto}
+.sideHead{padding:15px 15px 7px}
+.sideHead strong{font-size:17px}
+.sideHead div{margin-top:4px;font-size:11px;color:var(--muted)}
+.selection{margin:0 14px 9px;padding:11px 12px;min-height:45px;border-radius:12px;background:#f2f5f9;font-size:13px;line-height:1.45}
+.selection strong{color:var(--accent)}
+.cards{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px 11px 12px;align-content:start}
+.card{min-height:43px;padding:9px 5px;border:1px solid #d6dce7;border-radius:11px;background:#fff;color:#263247;font-weight:800}
+.card.active{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(1.015)}
+.card.used{opacity:.31}
+.actions{display:grid;grid-template-columns:1fr 1.45fr;gap:8px;padding:11px;border-top:1px solid #e4e8ef}
+.btn{border:0;border-radius:12px;padding:13px 8px;font-weight:900}
+.btn.secondary{background:#edf0f5;color:#334155}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:disabled{opacity:.35}
+.modal{position:fixed;inset:0;z-index:30;display:none;place-items:center;padding:20px;background:rgba(12,18,31,.46)}
+.modal.show{display:grid}
+.resultCard{width:min(450px,92vw);padding:28px;background:#fff;border-radius:25px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:pop .34s ease-out}
+@keyframes pop{0%{transform:scale(.66);opacity:0}75%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+.score{font-size:62px;font-weight:950;letter-spacing:-2px;margin:8px 0}
+.resultCard p{color:var(--muted);line-height:1.55}
+.resultCard button{border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:900;padding:12px 17px}
+@media(max-width:900px){
+  main{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr)}
+  .fixedLabel{font-size:6.7px}
+}
+@media(max-width:700px){
+  html,body{overflow:auto}
+  #app{height:auto;min-height:100%}
+  main{grid-template-columns:1fr;grid-template-rows:62vh 42vh}
+  .cards{grid-template-columns:repeat(4,1fr)}
+  .card{font-size:12px;min-height:38px;padding:6px 2px}
+  .subtitle{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div>
+    <h1>🇰🇷 대한민국 지역 찾기</h1>
+    <div class="subtitle">인구 상위 40개 시 · 지역 이름을 선택한 뒤 지도에서 위치를 터치하세요.</div>
+  </div>
+  <div class="counter"><span id="placedCount">0</span> / 40 배치</div>
+</header>
+
+<main>
+<section class="panel mapPanel" id="mapPanel">
+  <svg id="map" viewBox="0 0 760 900" aria-label="대한민국 시군 백지도">
+    <g id="viewport">
+      <g id="regions"></g>
+      <g id="labels"></g>
+      <g id="answers"></g>
+    </g>
+  </svg>
+  <div class="mapGuide">① 오른쪽에서 <b>지역 이름 터치</b><br>② 지도에서 <b>해당 지역 터치</b><br>채점 전에는 정답 여부가 표시되지 않습니다.</div>
+  <div class="zoom">
+    <button id="zoomIn" aria-label="확대">＋</button>
+    <button id="zoomOut" aria-label="축소">−</button>
+    <button id="zoomReset" aria-label="원래 크기">⌂</button>
+  </div>
+  <div class="status" id="mapStatus">두 손가락으로 확대·이동할 수 있어요.</div>
+  <div class="status result" id="legend"><b style="color:#1b8c4c">● 정답</b> &nbsp; <b style="color:#c53a3a">● 오답</b></div>
+  <div class="loading" id="loading">실제 시·군 행정경계를 불러오는 중…
+    <small>웹앱 첫 접속 시 인터넷 연결이 필요합니다.<br>로드 후에는 바로 활동을 시작할 수 있어요.</small>
+  </div>
+</section>
+
+<section class="panel side">
+  <div class="sideHead"><strong>지역 이름 40개</strong><div>배치한 이름을 다시 누르면 위치를 수정할 수 있습니다.</div></div>
+  <div class="selection" id="selection">먼저 지역 이름을 선택하세요.</div>
+  <div class="cards" id="cards"></div>
+  <div class="actions">
+    <button class="btn secondary" id="resetBtn">처음부터</button>
+    <button class="btn primary" id="checkBtn" disabled>✨ 결과 확인 ✨</button>
+  </div>
+</section>
+</main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="resultCard">
+    <div style="font-size:18px;font-weight:900">🎉 결과 발표!</div>
+    <div class="score"><span id="score">0</span><span style="font-size:24px"> / 40</span></div>
+    <p id="resultMessage"></p>
+    <button id="closeModal">지도에서 정답 확인하기</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* 첫 수업용 출제 목록.
+   최신 인구 순위는 이후 데이터 갱신 시 이 배열만 바꾸면 됩니다. */
+const TOP40 = [
+ "수원시","용인시","고양시","화성시","창원시","성남시","청주시","부천시","남양주시","천안시",
+ "전주시","안산시","평택시","시흥시","김해시","파주시","김포시","포항시","의정부시","아산시",
+ "광주시","구미시","원주시","양산시","진주시","하남시","제주시","양주시","춘천시","광명시",
+ "순천시","익산시","경산시","군산시","여수시","경주시","오산시","거제시","이천시","충주시"
+];
+
+const GEO_URLS = [
+  "https://cdn.jsdelivr.net/gh/DevMinGeonPark/mapcn-kr@main/data/sgg.json",
+  "https://raw.githubusercontent.com/DevMinGeonPark/mapcn-kr/main/data/sgg.json"
+];
+
+const METRO_NAMES = {
+  "서울특별시":"서울","부산광역시":"부산","대구광역시":"대구","인천광역시":"인천",
+  "광주광역시":"광주","대전광역시":"대전","울산광역시":"울산","세종특별자치시":"세종"
+};
+
+const SVG_NS="http://www.w3.org/2000/svg";
+const regionsG=document.getElementById("regions");
+const labelsG=document.getElementById("labels");
+const answersG=document.getElementById("answers");
+const viewport=document.getElementById("viewport");
+const svg=document.getElementById("map");
+const cardsEl=document.getElementById("cards");
+const selectionEl=document.getElementById("selection");
+const placedCountEl=document.getElementById("placedCount");
+const checkBtn=document.getElementById("checkBtn");
+const loading=document.getElementById("loading");
+
+let selected=null;
+let checked=false;
+let placements=new Map();       // 문제 이름 -> 학생이 고른 지역 키
+let groups=new Map();           // 지역 키 -> {features, paths, center, label}
+let projection=null;
+
+function shuffle(a){
+  const b=[...a];
+  for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}
+  return b;
+}
+
+function pName(p){return String(p.sggnm ?? p.SGG_NM ?? p.name ?? p.adm_nm ?? "").trim()}
+function pSido(p){return String(p.sidonm ?? p.SIDO_NM ?? p.sido_nm ?? p.sido ?? "").trim()}
+
+/* 일반시 산하 구는 한 도시로 묶는다.
+   예: 수원시 장안구/권선구/팔달구/영통구 → 수원시 */
+function logicalRegion(raw,sido){
+  const m=raw.match(/^(.+?시)\s+.+구$/);
+  if(m && !/(특별시|광역시)/.test(sido)) return m[1];
+  // 제주 데이터가 행정시로 제공되면 그대로 사용
+  return raw;
+}
+
+function metroLogical(raw,sido){
+  if(METRO_NAMES[sido]) return sido; // 서울·광역시 자치구는 광역시 하나로 취급
+  return logicalRegion(raw,sido);
+}
+
+function walkCoords(geom,fn){
+  if(!geom || !geom.coordinates) return;
+  function walk(v){
+    if(Array.isArray(v) && typeof v[0]==="number"){fn(v);return}
+    if(Array.isArray(v)) v.forEach(walk);
+  }
+  walk(geom.coordinates);
+}
+
+function createProjection(features){
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  features.forEach(f=>walkCoords(f.geometry,([x,y])=>{
+    if(Number.isFinite(x)&&Number.isFinite(y)){
+      minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+    }
+  }));
+  const W=760,H=900,pad=24;
+  const s=Math.min((W-2*pad)/(maxX-minX),(H-2*pad)/(maxY-minY));
+  return ([x,y])=>[pad+(x-minX)*s,H-pad-(y-minY)*s];
+}
+
+function ringPath(ring){
+  if(!ring.length)return "";
+  return ring.map((c,i)=>{
+    const [x,y]=projection(c);
+    return (i?"L":"M")+x.toFixed(2)+","+y.toFixed(2);
+  }).join("")+"Z";
+}
+function featurePath(g){
+  if(!g)return "";
+  if(g.type==="Polygon") return g.coordinates.map(ringPath).join("");
+  if(g.type==="MultiPolygon") return g.coordinates.flatMap(p=>p.map(ringPath)).join("");
+  return "";
+}
+
+function groupCenter(fs){
+  // 모든 꼭짓점 평균보다 bbox 중앙이 복잡한 다중폴리곤에서 더 안정적으로 라벨을 둔다.
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  fs.forEach(f=>walkCoords(f.geometry,c=>{
+    const [x,y]=projection(c);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+  }));
+  return [(minX+maxX)/2,(minY+maxY)/2];
+}
+
+function isQuiz(key){return TOP40.includes(key)}
+
+async function loadGeo(){
+  let lastError;
+  for(const url of GEO_URLS){
+    try{
+      const r=await fetch(url,{cache:"force-cache",mode:"cors"});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const data=await r.json();
+      if(!data || !Array.isArray(data.features)) throw new Error("GeoJSON 형식 오류");
+      return data;
+    }catch(e){lastError=e}
+  }
+  throw lastError || new Error("지도 데이터를 불러오지 못했습니다.");
+}
+
+function buildMap(data){
+  const features=data.features;
+  projection=createProjection(features);
+  groups.clear(); regionsG.innerHTML=""; labelsG.innerHTML=""; answersG.innerHTML="";
+
+  // 논리 지역 단위로 묶기
+  for(const f of features){
+    const p=f.properties||{};
+    const raw=pName(p), sido=pSido(p);
+    if(!raw) continue;
+    const key=metroLogical(raw,sido);
+    if(!groups.has(key)) groups.set(key,{features:[],paths:[],center:null,sido,label:key});
+    const g=groups.get(key);
+    g.features.push(f);
+    g.sido=sido;
+    g.label=METRO_NAMES[key] || key;
+  }
+  groups.forEach(g=>g.center=groupCenter(g.features));
+
+  for(const f of features){
+    const p=f.properties||{};
+    const raw=pName(p), sido=pSido(p);
+    if(!raw) continue;
+    const key=metroLogical(raw,sido);
+    const path=document.createElementNS(SVG_NS,"path");
+    path.setAttribute("d",featurePath(f.geometry));
+    path.setAttribute("class","region"+(isQuiz(key)?" quiz":""));
+    path.dataset.key=key;
+    path.addEventListener("click",e=>{e.stopPropagation();placeOn(key)});
+    regionsG.appendChild(path);
+    groups.get(key).paths.push(path);
+  }
+
+  // 비출제 시·군 이름 + 광역시 이름 표시
+  groups.forEach((g,key)=>{
+    if(isQuiz(key)) return;
+    const [x,y]=g.center;
+    const t=document.createElementNS(SVG_NS,"text");
+    t.setAttribute("x",x);t.setAttribute("y",y);
+    t.setAttribute("class",METRO_NAMES[key]?"metroLabel":"fixedLabel");
+    t.textContent=g.label;
+    labelsG.appendChild(t);
+  });
+
+  loading.remove();
+}
+
+function buildCards(){
+  cardsEl.innerHTML="";
+  shuffle(TOP40).forEach(name=>{
+    const b=document.createElement("button");
+    b.className="card";b.dataset.name=name;b.textContent=name;
+    b.addEventListener("click",()=>{
+      if(checked)return;
+      if(placements.has(name)) placements.delete(name);
+      selected=name;
+      drawAnswers();updateUI();
+      selectionEl.innerHTML=`선택: <strong>${name}</strong> → 지도에서 해당 지역을 터치하세요.`;
+    });
+    cardsEl.appendChild(b);
+  });
+}
+
+function placeOn(answerKey){
+  if(checked){
+    const entry=[...placements.entries()].find(([,a])=>a===answerKey);
+    if(entry){
+      const [question]=entry;
+      selectionEl.innerHTML=question===answerKey
+        ? `✅ <strong>${question}</strong> — 정답입니다.`
+        : `❌ 내가 넣은 답: <strong>${question}</strong><br>이 위치의 정답: <strong>${answerKey}</strong>`;
+    }
+    return;
+  }
+  if(!selected)return;
+
+  // 한 위치에는 하나의 답만.
+  for(const [q,a] of [...placements.entries()]){
+    if(a===answerKey) placements.delete(q);
+  }
+  placements.set(selected,answerKey);
+  selected=null;
+  drawAnswers();updateUI();
+  selectionEl.textContent="배치했습니다. 다음 지역을 선택하세요.";
+}
+
+function drawAnswers(){
+  answersG.innerHTML="";
+  placements.forEach((answerKey,question)=>{
+    const g=groups.get(answerKey);
+    if(!g)return;
+    const [x,y]=g.center;
+    const t=document.createElementNS(SVG_NS,"text");
+    t.setAttribute("x",x);t.setAttribute("y",y);
+    t.setAttribute("class","answerLabel");
+    t.textContent=question;
+    answersG.appendChild(t);
+  });
+}
+
+function updateUI(){
+  [...cardsEl.children].forEach(b=>{
+    const n=b.dataset.name;
+    b.classList.toggle("active",n===selected);
+    b.classList.toggle("used",placements.has(n)&&n!==selected);
+  });
+  placedCountEl.textContent=placements.size;
+  checkBtn.disabled=checked || placements.size!==TOP40.length;
+}
+
+function clearResultColors(){
+  groups.forEach(g=>g.paths.forEach(p=>p.classList.remove("good","bad")));
+}
+
+function scoreGame(){
+  checked=true;selected=null;clearResultColors();
+  let score=0;
+  placements.forEach((answerKey,question)=>{
+    const ok=question===answerKey;
+    if(ok)score++;
+    const g=groups.get(answerKey);
+    if(g)g.paths.forEach(p=>p.classList.add(ok?"good":"bad"));
+  });
+  document.getElementById("score").textContent=score;
+  document.getElementById("resultMessage").textContent=
+    score===40?"완벽해요! 40곳을 모두 맞혔습니다."
+    :score>=32?"아주 잘했어요! 빨간 지역만 다시 확인해 보세요."
+    :score>=20?"좋아요! 오답 지역의 위치를 지도에서 복습해 보세요."
+    :"주변 지역 이름을 단서로 위치를 하나씩 다시 익혀 보세요.";
+  document.getElementById("modal").classList.add("show");
+  document.getElementById("mapStatus").style.display="none";
+  document.getElementById("legend").style.display="block";
+  updateUI();
+  selectionEl.textContent="채점 완료! 색칠된 지역을 터치하면 내 답을 확인할 수 있습니다.";
+}
+
+function resetGame(){
+  checked=false;selected=null;placements.clear();clearResultColors();
+  document.getElementById("legend").style.display="none";
+  document.getElementById("mapStatus").style.display="block";
+  selectionEl.textContent="먼저 지역 이름을 선택하세요.";
+  buildCards();drawAnswers();updateUI();
+}
+
+// iPad용 SVG 확대/이동
+let scale=1,tx=0,ty=0;
+let pointers=new Map(),pinchDist=0,pinchMid=null,moved=false;
+
+function applyTransform(){viewport.setAttribute("transform",`translate(${tx} ${ty}) scale(${scale})`)}
+function zoomAt(factor,cx=380,cy=450){
+  const next=Math.max(1,Math.min(5,scale*factor));
+  const ratio=next/scale;
+  tx=cx-(cx-tx)*ratio;ty=cy-(cy-ty)*ratio;scale=next;
+  if(scale===1){tx=0;ty=0}
+  applyTransform();
+}
+function svgPointFromEvent(e){
+  const r=svg.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width*760,y:(e.clientY-r.top)/r.height*900};
+}
+svg.addEventListener("pointerdown",e=>{
+  svg.setPointerCapture?.(e.pointerId);
+  pointers.set(e.pointerId,svgPointFromEvent(e));moved=false;
+});
+svg.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId))return;
+  const now=svgPointFromEvent(e),old=pointers.get(e.pointerId);
+  pointers.set(e.pointerId,now);
+  const pts=[...pointers.values()];
+  if(pts.length===1 && scale>1){
+    const dx=now.x-old.x,dy=now.y-old.y;
+    if(Math.abs(dx)+Math.abs(dy)>.5)moved=true;
+    tx+=dx;ty+=dy;applyTransform();
+  }else if(pts.length>=2){
+    const a=pts[0],b=pts[1];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    if(pinchDist>0){
+      moved=true;
+      zoomAt(d/pinchDist,m.x,m.y);
+      if(pinchMid){tx+=m.x-pinchMid.x;ty+=m.y-pinchMid.y;applyTransform()}
+    }
+    pinchDist=d;pinchMid=m;
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size<2){pinchDist=0;pinchMid=null}
+}
+svg.addEventListener("pointerup",endPointer);
+svg.addEventListener("pointercancel",endPointer);
+
+document.getElementById("zoomIn").onclick=()=>zoomAt(1.3);
+document.getElementById("zoomOut").onclick=()=>zoomAt(1/1.3);
+document.getElementById("zoomReset").onclick=()=>{scale=1;tx=0;ty=0;applyTransform()};
+document.getElementById("resetBtn").onclick=resetGame;
+document.getElementById("checkBtn").onclick=scoreGame;
+document.getElementById("closeModal").onclick=()=>document.getElementById("modal").classList.remove("show");
+
+buildCards();updateUI();
+loadGeo().then(buildMap).catch(err=>{
+  loading.innerHTML=`지도를 불러오지 못했습니다.<small>${String(err.message||err)}<br><br>이 파일은 Safari에서 웹주소(https://…)로 접속했을 때 사용하도록 만든 버전입니다.</small>`;
+});
+</script>
+</body>
+</html>
